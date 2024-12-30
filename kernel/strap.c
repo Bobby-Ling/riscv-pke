@@ -60,8 +60,22 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
       // dynamically increase application stack.
       // hint: first allocate a new physical page, and then, maps the new page to the
       // virtual address that causes the page fault.
-      panic( "You need to implement the operations that actually handle the page fault in lab2_3.\n" );
-
+      // panic( "You need to implement the operations that actually handle the page fault in lab2_3.\n" );
+    {
+      // sepc: Supervisor Exception Program Counter
+      // 保存了异常发生时的程序计数器(PC). 当发生异常时, sepc 保存的是异常发生时的地址, 即指向发生异常的那条指令的地址.
+      // stval: Supervisor Trap Value
+      // 页面错误的情况下, stval 存储的是触发页面错误的虚拟地址, 很可能非整PGSIZE
+      // 分配一个物理页
+      uint64 new_page_pa = (uint64)alloc_page();
+      user_vm_map(
+        (pagetable_t)current->pagetable,
+        ROUNDDOWN(stval, PGSIZE),
+        PGSIZE,
+        new_page_pa,
+        prot_to_type(PROT_READ | PROT_WRITE, 1)
+      );
+    }
       break;
     default:
       sprint("unknown page fault.\n");
