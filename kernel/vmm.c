@@ -159,7 +159,17 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // (va & (1<<PGSHIFT -1)) means computing the offset of "va" inside its page.
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
-  panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
+  // panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
+  // 2GB = 512 * 4KB, 相当于只用到了VPN[0]
+  // page_addr即PPN, 后12位为0
+  uint64 page_addr = lookup_pa(page_dir, (uint64)va);
+  if (page_addr) {
+    uint64 offset = ((uint64)va & ((1 << PGSHIFT) - 1));
+    return (void *)(page_addr + offset);
+  }
+  else {
+    return NULL;
+  }
 
 }
 
