@@ -22,8 +22,9 @@ static void handle_syscall(trapframe *tf) {
   // kernel/syscall.c) to conduct real operations of the kernel side for a syscall.
   // IMPORTANT: return value should be returned to user app, or else, you will encounter
   // problems in later experiments!
-  panic( "call do_syscall to accomplish the syscall and lab1_1 here.\n" );
-
+  tf->regs.a0 = do_syscall(tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3, tf->regs.a4, tf->regs.a5, tf->regs.a6, tf->regs.a7);
+  // 实际上在switch_to(current)时a0存放的返回值才实际写入
+  // panic( "call do_syscall to accomplish the syscall and lab1_1 here.\n" );
 }
 
 //
@@ -37,21 +38,26 @@ void handle_mtimer_trap() {
   // TODO (lab1_3): increase g_ticks to record this "tick", and then clear the "SIP"
   // field in sip register.
   // hint: use write_csr to disable the SIP_SSIP bit in sip.
-  panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
-
+  // panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
+  g_ticks++;
+  // handle_timer()中使用write_csr(sip, SIP_SSIP)设置了SIP
+  write_csr(sip, read_csr(sip) & ~SIP_SSIP);
 }
 
 //
 // kernel/smode_trap.S will pass control to smode_trap_handler, when a trap happens
 // in S-mode.
+// 在 S 模式中处理陷入后, 安全地返回用户态继续执行
 //
 void smode_trap_handler(void) {
+  // 当前是S模式, 检查的是Previous mode是否来自用户模式
   // make sure we are in User mode before entering the trap handling.
   // we will consider other previous case in lab1_3 (interrupt).
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0) panic("usertrap: not from user mode");
 
   assert(current);
   // save user process counter.
+  // 保存用户态上下文
   current->trapframe->epc = read_csr(sepc);
 
   // if the cause of trap is syscall from user application.
@@ -70,5 +76,6 @@ void smode_trap_handler(void) {
   }
 
   // continue (come back to) the execution of current process.
+  // 实际上在这里面变更才实际写入
   switch_to(current);
 }
