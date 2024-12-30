@@ -486,7 +486,7 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
 
   // initialize the states of the file being created
 
-  // TODO (lab4_1): implement the code for populating the disk inode (free_dinode) 
+  // TODO (lab4_1): implement the code for populating the disk inode (free_dinode)
   // of a new file being created.
   // hint:  members of free_dinode to be filled are:
   // size, should be zero for a new file.
@@ -494,7 +494,11 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   // nlinks, i.e., the number of links.
   // blocks, i.e., its block count.
   // Note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code of populating a disk inode in lab4_1.\n" );
+  // panic("You need to implement the code of populating a disk inode in lab4_1.\n" );
+  free_dinode->type = R_FILE;
+  free_dinode->size = 0;
+  free_dinode->blocks = 1;
+  free_dinode->nlinks = 1;
 
   // DO NOT REMOVE ANY CODE BELOW.
   // allocate a free block for the file
@@ -547,7 +551,7 @@ int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offse
       sprint("rfs_lseek: invalid whence!\n");
       return -1;
   }
-  
+
   return 0;
 }
 
@@ -579,19 +583,34 @@ int rfs_disk_stat(struct vinode *vinode, struct istat *istat) {
 int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node) {
   // TODO (lab4_3): we now need to establish a hard link to an existing file whose vfs
   // inode is "link_node". To do that, we need first to know the name of the new (link)
-  // file, and then, we need to increase the link count of the existing file. Lastly, 
+  // file, and then, we need to increase the link count of the existing file. Lastly,
   // we need to make the changes persistent to disk. To know the name of the new (link)
-  // file, you need to stuty the structure of dentry, that contains the name member;
+  // file, you need to study the structure of dentry, that contains the name member;
   // To incease the link count of the existing file, you need to study the structure of
   // vfs inode, since it contains the inode information of the existing file.
   //
   // hint: to accomplish this experiment, you need to:
   // 1) increase the link count of the file to be hard-linked;
-  // 2) append the new (link) file as a dentry to its parent directory; you can use 
+  // 2) append the new (link) file as a dentry to its parent directory; you can use
   //    rfs_add_direntry here.
   // 3) persistent the changes to disk. you can use rfs_write_back_vinode here.
   //
-  panic("You need to implement the code for creating a hard link in lab4_3.\n" );
+  // panic("You need to implement the code for creating a hard link in lab4_3.\n" );
+
+  // 原始inode硬链接++
+  link_node->nlinks++;
+  // sub_dentry: 目标
+  // parent: 当前目录inode
+  if (rfs_add_direntry(parent, sub_dentry->name, link_node->inum) == -1) {
+    sprint("rfs_link: rfs_add_direntry failed");
+    return -1;
+  }
+  // 目录项为缓存, 不需要持久化, 只有link_node需要
+  if (rfs_write_back_vinode(link_node) != 0) {
+    sprint("rfs_link: rfs_write_back_vinode failed");
+    return -1;
+  }
+  return 0;
 }
 
 //
@@ -670,7 +689,7 @@ int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *
     struct rfs_direntry *this_block = (struct rfs_direntry *)alloc_page();
     memcpy(this_block, rdev->iobuffer, RFS_BLKSIZE);
 
-    // copy the first direntry of this block to the last direntry 
+    // copy the first direntry of this block to the last direntry
     // of previous block
     memcpy(previous_block + one_block_direntrys - 1, rdev->iobuffer,
            sizeof(struct rfs_direntry));
@@ -787,7 +806,16 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   // the method of returning is to popular proper members of "dir", more specifically,
   // dir->name and dir->inum.
   // note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code for reading a directory entry of rfs in lab4_2.\n" );
+  // panic("You need to implement the code for reading a directory entry of rfs in lab4_2.\n" );
+
+  // dir_vinode: 父目录
+  // p_direntry: offset处的目录项
+  // 根据dir_vinode目录文件得到dir
+  dir->inum = p_direntry->inum;
+  strcpy(dir->name, p_direntry->name);
+
+
+
 
   // DO NOT DELETE CODE BELOW.
   (*offset)++;
@@ -862,7 +890,7 @@ struct super_block *rfs_get_superblock(struct device *dev) {
   sb->ninodes = d_sb.ninodes;
   sb->s_dev = dev;
 
-  if( sb->magic != RFS_MAGIC ) 
+  if (sb->magic != RFS_MAGIC)
     panic("rfs_get_superblock: wrong ramdisk device!\n");
 
   // build root dentry and root inode
