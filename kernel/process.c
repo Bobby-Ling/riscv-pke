@@ -1,7 +1,7 @@
 /*
- * Utility functions for process management. 
+ * Utility functions for process management.
  *
- * Note: in Lab1, only one process (i.e., our user application) exists. Therefore, 
+ * Note: in Lab1, only one process (i.e., our user application) exists. Therefore,
  * PKE OS at this stage will set "current" to the loaded user application, and also
  * switch to the old "current" process after trap handling.
  */
@@ -185,14 +185,18 @@ int do_fork( process* parent)
     // map its code segment.
     switch( parent->mapped_info[i].seg_type ){
       case CONTEXT_SEGMENT:
+        // 直接复制
         *child->trapframe = *parent->trapframe;
         break;
       case STACK_SEGMENT:
+        // 空间已经分配, 直接复制
+        // TODO: 只复制一个PGSIZE?
         memcpy( (void*)lookup_pa(child->pagetable, child->mapped_info[STACK_SEGMENT].va),
           (void*)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE );
         break;
       case HEAP_SEGMENT:
-        // build a same heap for child process.
+      {
+                // build a same heap for child process.
 
         // convert free_pages_address into a filter to skip reclaimed blocks in the heap
         // when mapping the heap blocks
@@ -220,9 +224,11 @@ int do_fork( process* parent)
 
         // copy the heap manager from parent to child
         memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
+      }
         break;
       case CODE_SEGMENT:
-        // TODO (lab3_1): implment the mapping of child code segment to parent's
+      {
+          // TODO (lab3_1): implment the mapping of child code segment to parent's
         // code segment.
         // hint: the virtual address mapping of code segment is tracked in mapped_info
         // page of parent's process structure. use the information in mapped_info to
@@ -231,7 +237,25 @@ int do_fork( process* parent)
         // address region of child to the physical pages that actually store the code
         // segment of parent process.
         // DO NOT COPY THE PHYSICAL PAGES, JUST MAP THEM.
-        panic( "You need to implement the code segment mapping of child in lab3_1.\n" );
+        // panic( "You need to implement the code segment mapping of child in lab3_1.\n" );
+
+        // TODO: mapped_info的索引含义究竟是key还是index
+        // parent->mapped_info[i].seg_type == CODE_SEGMENT
+        // 可能需要多个Page来存, 其中va为连续的
+        for (size_t j = 0; j < parent->mapped_info[i].npages; j++) {
+          uint64 parent_pa = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
+          // 在child中构建将child va映射到parent_pa的表项
+          map_pages(
+            child->pagetable,
+            parent->mapped_info[i].va + j * PGSIZE,
+            PGSIZE,
+            parent_pa,
+            prot_to_type(PROT_READ | PROT_WRITE | PROT_EXEC, 1)
+          );
+          sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
+            parent_pa, parent->mapped_info[i].va + j * PGSIZE
+          );
+        }
 
         // after mapping, register the vm region (do not delete codes below!)
         child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
@@ -239,6 +263,7 @@ int do_fork( process* parent)
           parent->mapped_info[i].npages;
         child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
         child->total_mapped_region++;
+      }
         break;
     }
   }
