@@ -34,6 +34,9 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
+  // in lab1, PKE considers only one app (one process).
+  // therefore, shutdown the system when the app calls exit()
+  // shutdown(code);
   // reclaim the current process, and reschedule. added @lab3_1
   free_process( current );
   schedule();
@@ -90,8 +93,10 @@ ssize_t sys_user_yield() {
   // hint: the functionality of yield is to give up the processor. therefore,
   // we should set the status of currently running process to READY, insert it in
   // the rear of ready queue, and finally, schedule a READY process to run.
-  panic( "You need to implement the yield syscall in lab3_2.\n" );
-
+  // panic( "You need to implement the yield syscall in lab3_2.\n" );
+  current->status = READY;
+  insert_to_ready_queue(current);
+  schedule();
   return 0;
 }
 

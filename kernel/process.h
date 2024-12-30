@@ -74,6 +74,7 @@ typedef struct process_t {
   // points to a page that contains mapped_regions. below are added @lab3_1
   mapped_region *mapped_info;
   // next free mapped region in mapped_info
+  // 当前进程的 `mapped_info` 中已使用的区域数量
   int total_mapped_region;
 
   // heap management
