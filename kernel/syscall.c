@@ -33,11 +33,17 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
+  // sprint_internal("User exit with code:%d.\n", code);
   // in lab1, PKE considers only one app (one process).
   // therefore, shutdown the system when the app calls exit()
   // shutdown(code);
   // reclaim the current process, and reschedule. added @lab3_1
   free_process( current );
+  if (current->parent) {
+    // 结束时要将阻塞的父进程复活
+    // sprint("sys_user_exit: %d: %d\n", current->pid, current->parent->pid);
+    insert_to_ready_queue(current->parent);
+  }
   schedule();
   return 0;
 }
@@ -80,7 +86,7 @@ uint64 sys_user_free_page(uint64 va) {
 // kerenl entry point of naive_fork
 //
 ssize_t sys_user_fork() {
-  sprint("User call fork.\n");
+  // sprint("User call fork.\n");
   return do_fork( current );
 }
 
@@ -97,6 +103,13 @@ ssize_t sys_user_yield() {
   insert_to_ready_queue(current);
   schedule();
   return 0;
+}
+
+//
+// kerenl entry point of wait
+//
+ssize_t sys_user_wait(int pid) {
+  return do_wait(pid);
 }
 
 //
@@ -118,6 +131,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_fork();
     case SYS_user_yield:
       return sys_user_yield();
+    case SYS_user_wait:
+      return sys_user_wait(a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }

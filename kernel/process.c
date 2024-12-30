@@ -136,8 +136,8 @@ process* alloc_process() {
   procs[i].mapped_info[SYSTEM_SEGMENT].npages = 1;
   procs[i].mapped_info[SYSTEM_SEGMENT].seg_type = SYSTEM_SEGMENT;
 
-  sprint("in alloc_proc. user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n",
-    procs[i].trapframe, procs[i].trapframe->regs.sp, procs[i].kstack);
+  // sprint("in alloc_proc. user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n",
+    // procs[i].trapframe, procs[i].trapframe->regs.sp, procs[i].kstack);
 
   // initialize the process's heap manager
   procs[i].user_heap.heap_top = USER_FREE_ADDRESS_START;
@@ -177,7 +177,7 @@ int free_process( process* proc ) {
 //
 int do_fork( process* parent)
 {
-  sprint( "will fork a child from parent %d.\n", parent->pid );
+  // sprint( "will fork a child from parent %d.\n", parent->pid );
   process* child = alloc_process();
 
   for( int i=0; i<parent->total_mapped_region; i++ ){
@@ -252,9 +252,9 @@ int do_fork( process* parent)
             parent_pa,
             prot_to_type(PROT_READ | PROT_WRITE | PROT_EXEC, 1)
           );
-          sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
-            parent_pa, parent->mapped_info[i].va + j * PGSIZE
-          );
+          // sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
+            // parent_pa, parent->mapped_info[i].va + j * PGSIZE
+          // );
         }
 
         // after mapping, register the vm region (do not delete codes below!)
@@ -264,6 +264,21 @@ int do_fork( process* parent)
         child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
         child->total_mapped_region++;
       }
+      break;
+      case DATA_SEGMENT:
+        for (int j = 0; j < parent->mapped_info[i].npages; j++) {
+          uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
+          char *newaddr = alloc_page(); memcpy(newaddr, (void *)addr, PGSIZE);
+          map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
+                  (uint64)newaddr, prot_to_type(PROT_WRITE | PROT_READ, 1));
+        }
+
+        // after mapping, register the vm region (do not delete codes below!)
+        child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
+        child->mapped_info[child->total_mapped_region].npages =
+          parent->mapped_info[i].npages;
+        child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
+        child->total_mapped_region++;
         break;
     }
   }
@@ -274,4 +289,87 @@ int do_fork( process* parent)
   insert_to_ready_queue( child );
 
   return child->pid;
+}
+
+/**
+ * @brief 阻塞调用进程(pid), 直到其子进程之一终止
+ *
+ * @param pid: -1 当前进程将等待任意一个子进程的终止
+ * @param pid: pid 当前进程将等待pid的终止
+ * @return pid: 如果有子进程返回已终止的子进程的 PID
+ * @return 0: 如果没有子进程(暂时不关注)
+ */
+int do_wait(int pid) {
+  // sprint("do_wait: %d call wait %d.\n", current->pid, pid);
+  // process 0 call wait -1.
+  // process 1 call wait 2.
+  // procs[pid]
+  int wait_pid = pid;
+  if (pid == -1) {
+    // 找到一个即可
+    bool find = FALSE;
+    for (int i = 0; i < NPROC; i++) {
+      if (procs[i].parent == current) {
+        find = TRUE;
+        wait_pid = i;
+      }
+    }
+    if (!find) {
+      // sprint("do_wait: no child\n");
+      return 0;
+    }
+  }
+  if (wait_pid < NPROC) {
+    // current将等待pid的终止
+    current->status = BLOCKED;
+    // sprint("do_wait: %d %d %d %d.\n",
+    // current->pid, current->status, wait_pid, procs[wait_pid].status);
+    // print_ready_queue();
+    // insert_to_ready_queue(current);
+    // print_ready_queue();
+    // print_processes();
+    // 从就绪队列(ready queue)中选取下一个可运行的进程, 并将其切换为当前运行的进程(current)
+    // 即下一步运行pid
+    schedule();
+  }
+  else {
+    panic("invalid pid %d\n", pid);
+  }
+  return 0;
+}
+
+void print_processes() {
+  sprint("Processes: [");
+
+  process *p = NULL;
+  for (size_t i = 0; i < NPROC; i++) {
+    p = &(procs[i]);
+
+    const char *status_str;
+    switch (p->status) {
+      case FREE:
+        // status_str = "FREE";
+        continue;
+        break;
+      case READY:
+        status_str = "READY";
+        break;
+      case RUNNING:
+        status_str = "RUNNING";
+        break;
+      case BLOCKED:
+        status_str = "BLOCKED";
+        break;
+      case ZOMBIE:
+        status_str = "ZOMBIE";
+        break;
+      default:
+        status_str = "UNKNOWN";
+        break;
+    }
+
+    sprint("{%d: %s} ", p->pid, status_str);
+    p = p->queue_next;
+  }
+  sprint("]\n");
 }

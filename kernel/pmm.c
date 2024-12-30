@@ -9,7 +9,7 @@
 // _end is defined in kernel/kernel.lds, it marks the ending (virtual) address of PKE kernel
 extern char _end[];
 // g_mem_size is defined in spike_interface/spike_memory.c, it indicates the size of our
-// (emulated) spike machine. g_mem_size's value is obtained when initializing HTIF. 
+// (emulated) spike machine. g_mem_size's value is obtained when initializing HTIF.
 extern uint64 g_mem_size;
 
 static uint64 free_mem_start_addr;  //beginning address of free memory
@@ -66,8 +66,8 @@ void pmm_init() {
   uint64 g_kernel_end = (uint64)&_end;
 
   uint64 pke_kernel_size = g_kernel_end - g_kernel_start;
-  sprint("PKE kernel start 0x%lx, PKE kernel end: 0x%lx, PKE kernel size: 0x%lx .\n",
-    g_kernel_start, g_kernel_end, pke_kernel_size);
+  // sprint("PKE kernel start 0x%lx, PKE kernel end: 0x%lx, PKE kernel size: 0x%lx .\n",
+    // g_kernel_start, g_kernel_end, pke_kernel_size);
 
   // free memory starts from the end of PKE kernel and must be page-aligined
   free_mem_start_addr = ROUNDUP(g_kernel_end , PGSIZE);
@@ -79,10 +79,10 @@ void pmm_init() {
     panic( "Error when recomputing physical memory size (g_mem_size).\n" );
 
   free_mem_end_addr = g_mem_size + DRAM_BASE;
-  sprint("free physical memory address: [0x%lx, 0x%lx] \n", free_mem_start_addr,
-    free_mem_end_addr - 1);
+  // sprint("free physical memory address: [0x%lx, 0x%lx] \n", free_mem_start_addr,
+    // free_mem_end_addr - 1);
 
-  sprint("kernel memory manager is initializing ...\n");
+  // sprint("kernel memory manager is initializing ...\n");
   // create the list of free pages
   create_freepage_list(free_mem_start_addr, free_mem_end_addr);
 }

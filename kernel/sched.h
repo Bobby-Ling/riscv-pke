@@ -8,5 +8,7 @@
 
 void insert_to_ready_queue( process* proc );
 void schedule();
+// added @lab3_challenge1_wait
+void print_ready_queue();
 
 #endif

@@ -7,6 +7,9 @@
 
 process* ready_queue_head = NULL;
 
+// added @lab3_challenge1_wait
+process *block_queue_head = NULL;
+
 //
 // insert a process, proc, into the END of ready queue.
 //
@@ -24,15 +27,58 @@ void insert_to_ready_queue( process* proc ) {
   process *p;
   // browse the ready queue to see if proc is already in-queue
   for( p=ready_queue_head; p->queue_next!=NULL; p=p->queue_next )
-    if( p == proc ) return;  //already in queue
+    if (p == proc) {
+      // sprint("insert_to_ready_queue: %d already in queue\n", p->pid);
+      return;  //already in queue
+    }
 
   // p points to the last element of the ready queue
-  if( p==proc ) return;
+  if (p == proc) return;
   p->queue_next = proc;
   proc->status = READY;
   proc->queue_next = NULL;
 
   return;
+}
+
+void print_ready_queue() {
+  sprint("Ready Queue: [");
+
+  // 检查队列是否为空
+  if (ready_queue_head == NULL) {
+    sprint("[Empty Queue]\n");
+    return;
+  }
+
+  // 遍历就绪队列并打印每个进程的信息
+  process *p = ready_queue_head;
+  while (p != NULL) {
+    const char *status_str;
+    switch (p->status) {
+      case FREE:
+        status_str = "FREE";
+        break;
+      case READY:
+        status_str = "READY";
+        break;
+      case RUNNING:
+        status_str = "RUNNING";
+        break;
+      case BLOCKED:
+        status_str = "BLOCKED";
+        break;
+      case ZOMBIE:
+        status_str = "ZOMBIE";
+        break;
+      default:
+        status_str = "UNKNOWN";
+        break;
+    }
+
+    sprint("{%d: %s} ", p->pid, status_str);
+    p = p->queue_next;
+  }
+  sprint("]\n");
 }
 
 //
@@ -51,7 +97,7 @@ void schedule() {
     for( int i=0; i<NPROC; i++ )
       if( (procs[i].status != FREE) && (procs[i].status != ZOMBIE) ){
         should_shutdown = 0;
-        sprint( "ready queue empty, but process %d is not in free/zombie state:%d\n", 
+        sprint("ready queue empty, but process %d is not in free/zombie state:%d\n",
           i, procs[i].status );
       }
 

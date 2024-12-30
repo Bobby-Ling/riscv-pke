@@ -1,0 +1,14 @@
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Grandchild process end, flag = 2.
+User exit with code:0.
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child process end, flag = 1.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent process end, flag = 0.
+User exit with code:0.
+no more ready processes, system shutdown now.
+System is shutting down with exit code 0.
