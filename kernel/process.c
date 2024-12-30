@@ -196,7 +196,7 @@ int do_fork( process* parent)
         break;
       case HEAP_SEGMENT:
       {
-                // build a same heap for child process.
+        // build a same heap for child process.
 
         // convert free_pages_address into a filter to skip reclaimed blocks in the heap
         // when mapping the heap blocks
@@ -228,7 +228,7 @@ int do_fork( process* parent)
         break;
       case CODE_SEGMENT:
       {
-          // TODO (lab3_1): implment the mapping of child code segment to parent's
+        // TODO (lab3_1): implment the mapping of child code segment to parent's
         // code segment.
         // hint: the virtual address mapping of code segment is tracked in mapped_info
         // page of parent's process structure. use the information in mapped_info to
