@@ -38,21 +38,26 @@ void handle_mtimer_trap() {
   // TODO (lab1_3): increase g_ticks to record this "tick", and then clear the "SIP"
   // field in sip register.
   // hint: use write_csr to disable the SIP_SSIP bit in sip.
-  panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
-
+  // panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
+  g_ticks++;
+  // handle_timer()中使用write_csr(sip, SIP_SSIP)设置了SIP
+  write_csr(sip, read_csr(sip) & ~SIP_SSIP);
 }
 
 //
 // kernel/smode_trap.S will pass control to smode_trap_handler, when a trap happens
 // in S-mode.
+// 在 S 模式中处理陷入后, 安全地返回用户态继续执行
 //
 void smode_trap_handler(void) {
+  // 当前是S模式, 检查的是Previous mode是否来自用户模式
   // make sure we are in User mode before entering the trap handling.
   // we will consider other previous case in lab1_3 (interrupt).
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0) panic("usertrap: not from user mode");
 
   assert(current);
   // save user process counter.
+  // 保存用户态上下文
   current->trapframe->epc = read_csr(sepc);
 
   // if the cause of trap is syscall from user application.
