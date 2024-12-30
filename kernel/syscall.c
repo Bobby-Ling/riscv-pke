@@ -31,7 +31,7 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
-  // in lab1, PKE considers only one app (one process). 
+  // in lab1, PKE considers only one app (one process).
   // therefore, shutdown the system when the app calls exit()
   shutdown(code);
 }
@@ -42,6 +42,8 @@ ssize_t sys_user_exit(uint64 code) {
 uint64 sys_user_allocate_page() {
   void* pa = alloc_page();
   uint64 va = g_ufree_page;
+  // USER_FREE_ADDRESS_START = 4MB
+  // 每次分配4KB
   g_ufree_page += PGSIZE;
   user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
          prot_to_type(PROT_WRITE | PROT_READ, 1));
