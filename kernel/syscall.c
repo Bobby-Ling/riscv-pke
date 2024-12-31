@@ -105,9 +105,28 @@ ssize_t sys_user_yield() {
 //
 ssize_t sys_user_open(char *pathva, int flags) {
   char* pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
-  return do_open(pathpa, flags);
+  char path[MAX_FILE_NAME_LEN];
+  // 1. "./"
+  if (pathpa[0] == '.' && pathpa[1] == '/') {
+    path[0] = '/';
+    strcat(path, current->pfiles->cwd->name);
+    strcat(path, pathpa + 1);
+  }
+  // 2. ".."
+  else if (pathpa[0] == '.' && pathpa[1] == '.') {
+    path[0] = '/';
+    strcat(path, current->pfiles->cwd->parent->name);
+    if (pathpa[2] == '/') {
+      strcat(path, pathpa + 3);
+    }
+  }
+  // 3. "/"
+  else {
+    strcpy(path, pathpa);
+  }
+  // sprint("open: %s", path);
+  return do_open(path, flags);
 }
-
 //
 // read file
 //
@@ -219,6 +238,76 @@ ssize_t sys_user_unlink(char * vfn){
 }
 
 //
+// lib call to read present working directory (pwd)
+//
+/**
+ * @param pathva
+ */
+ssize_t sys_user_rcwd(char *pathva) {
+  char path[MAX_FILE_NAME_LEN];
+  memset(path, 0, sizeof(path));
+
+  // Ensure the path starts with '/' if not already absolute
+  if (current->pfiles->cwd->name[0] != '/') {
+    path[0] = '/';
+  }
+
+  // Concatenate the current working directory name to the path
+  strcat(path, current->pfiles->cwd->name);
+
+  // Translate the user virtual address to a physical address and copy the path
+  char *pa = user_va_to_pa(current->pagetable, (void *)pathva);
+  strcpy(pa, path);
+
+  return 0;
+}
+
+//
+// lib call to change pwd
+//
+ssize_t sys_user_ccwd(char *pathva) {
+  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  // sprint("user cd: %s\n", pathpa);
+  char path[MAX_FILE_NAME_LEN];
+
+  // 1: "./"
+  if (pathpa[0] == '.' && pathpa[1] == '/') {
+    strcpy(path, pathpa + 2);
+    // 从当前目录解析相对路径
+  }
+  // 2: ".."
+  else if (pathpa[0] == '.' && pathpa[1] == '.') {
+    // cd到上级目录
+    current->pfiles->cwd = current->pfiles->cwd->parent;
+    // 如果后续还有路径信息 "../..."
+    if (pathpa[2] == '/') {
+      // remove ""../"
+      strcpy(path, pathpa + 3);
+    }
+    else {
+   // 已经完成cd了
+      return 0;
+    }
+  }
+  // 3: 绝对路径
+  else {
+    if (pathpa[0] == '/') {
+        // 如果是绝对路径, 跳过开头的 "/"
+      strcpy(path, pathpa + 1);
+    }
+    else {
+     // 普通相对路径
+      strcpy(path, pathpa);
+    }
+  }
+  // 切换至path
+  // sprint("cd: %s\n", path);
+  current->pfiles->cwd = hash_get_dentry(current->pfiles->cwd, path);
+  return 0;
+}
+
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -266,6 +355,11 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_link((char *)a1, (char *)a2);
     case SYS_user_unlink:
       return sys_user_unlink((char *)a1);
+    // added @lab4_challenge1_relativepath
+    case SYS_user_rcwd:
+      return sys_user_rcwd((char *)a1);
+    case SYS_user_ccwd:
+      return sys_user_ccwd((char *)a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }
