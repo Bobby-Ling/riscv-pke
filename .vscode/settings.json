@@ -1,5 +1,31 @@
 {
     "C_Cpp.codeAnalysis.clangTidy.args": [
         "-target riscv64 -march=rv64imafdc -mcmodel=medany"
-    ]
+    ],
+    "files.associations": {
+        "*.txt": "plaintext",
+        "*.less": "less",
+        ".gdbinit": "gdb",
+        "*.S": "riscv",
+        "*.c": "c",
+        "*.log": "log",
+        "*.sql": "sql",
+        "*.qml": "qml",
+        "CMakeLists.txt": "cmake",
+        "*.int": "python",
+        "*.spec": "python",
+        "*.pth": "python",
+        ".gitconfig": "ini",
+        "*.mod": "go",
+        "*.cpp": "cpp",
+        "*.md": "markdown",
+        "*.vh": "verilog",
+        "*.20241103": "log",
+        "*.result": "sql",
+        "*.tmp": "sql",
+        "*.20241104": "log",
+        "dockerfile": "dockerfile",
+        "user_lib.h": "c",
+        "elf.h": "c"
+    }
 }

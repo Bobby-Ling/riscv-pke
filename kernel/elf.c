@@ -75,6 +75,101 @@ elf_status elf_load(elf_ctx *ctx) {
   return EL_OK;
 }
 
+symbol_info sym_info;
+typedef struct elf_sym_t {
+  uint32 name;  /* Symbol name (string table index) */
+  uint8 info;   /* Symbol type and binding */
+  uint8 other;  /* Symbol visibility */
+  uint16 shndx; /* Section index */
+  uint64 value; /* Symbol value (address) */
+  uint64 size;  /* Symbol size */
+} elf_sym;
+
+static void load_symbols(elf_ctx *ctx) {
+    // 1. 找到 section header 字符串表，并读取所有 section 的名字
+  elf_section_header sh_str;
+  if (elf_fpread(ctx, &sh_str, sizeof(sh_str),
+    ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_section_header)) != sizeof(sh_str)) {
+    panic("Failed to read section header string table.\n");
+  }
+
+  char section_name[sh_str.sh_size];
+  if (elf_fpread(ctx, section_name, sh_str.sh_size, sh_str.sh_offset) != sh_str.sh_size) {
+    panic("Failed to read section names.\n");
+  }
+
+  // 2. 找到 .symtab 和 .strtab 的 section header
+  elf_section_header sh_symtab = {0};
+  elf_section_header sh_strtab = {0};
+  for (uint16 i = 0; i < ctx->ehdr.shnum; i++) {
+    uint64 shoff = ctx->ehdr.shoff + i * sizeof(elf_section_header);
+    elf_section_header sh_tmp;
+    if (elf_fpread(ctx, &sh_tmp, sizeof(sh_tmp), shoff) != sizeof(sh_tmp)) {
+      panic("Failed to read section header.\n");
+    }
+
+    if (strcmp(section_name + sh_tmp.sh_name, ".symtab") == 0) {
+      sh_symtab = sh_tmp;
+    }
+    else if (strcmp(section_name + sh_tmp.sh_name, ".strtab") == 0) {
+      sh_strtab = sh_tmp;
+    }
+  }
+
+  if (sh_symtab.sh_size == 0 || sh_strtab.sh_size == 0) {
+    panic(".symtab or .strtab section not found.\n");
+  }
+
+  // 3. 读取 .symtab 中所有函数符号的信息
+  uint64 symnum = sh_symtab.sh_size / sizeof(elf_symbol);
+  int count = 0;
+  elf_symbol symbol_tmp;
+  for (uint64 i = 0; i < symnum; i++) {
+    if (elf_fpread(ctx, &symbol_tmp, sizeof(symbol_tmp),
+      sh_symtab.sh_offset + i * sizeof(elf_symbol)) != sizeof(symbol_tmp)) {
+      panic("Failed to read symbol table entry.\n");
+    }
+
+    // 判断符号是否是函数（STT_FUNC 类型）
+    if (symbol_tmp.st_info == STT_FUNC) {
+        // 读取符号名称
+      if (elf_fpread(ctx, sym_info.sym_names[count], sizeof(sym_info.sym_names[count]),
+        sh_strtab.sh_offset + symbol_tmp.st_name) < 0) {
+        panic("Failed to read symbol name.\n");
+      }
+
+      // 保存符号信息
+      sym_info.symbols[count] = symbol_tmp;
+      count++;
+    }
+  }
+
+  sym_info.sym_count = count;
+  sprint("Loaded %d function symbols.\n", sym_info.sym_count);
+}
+
+void print_symbol_info(const symbol_info *sym_info) {
+  if (!sym_info) {
+    sprint("No symbol information available.\n");
+    return;
+  }
+
+  sprint("Symbol Information:\n");
+  sprint("Total Functions: %d\n", sym_info->sym_count);
+
+  for (int i = 0; i < sym_info->sym_count; i++) {
+    const elf_symbol *sym = &sym_info->symbols[i];
+    const char *name = sym_info->sym_names[i];
+
+    sprint("Symbol %d:\n", i + 1);
+    sprint("  Name: %s\n", name);
+    sprint("  Address: 0x%lx\n", sym->st_value);
+    // sprint("  Size: %lu bytes\n", sym->st_size);
+    // sprint("  Info: 0x%x\n", sym->st_info);
+    // sprint("  Other: 0x%x\n", sym->st_other);
+    // sprint("  Section Index: 0x%x\n", sym->st_shndx);
+  }
+}
 typedef union {
   uint64 buf[MAX_CMDLINE_ARGS];
   char *argv[MAX_CMDLINE_ARGS];
@@ -129,6 +224,10 @@ void load_bincode_from_host_elf(process *p) {
 
   // load elf. elf_load() is defined above.
   if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
+
+  load_symbols(&elfloader);
+
+  // print_symbol_info(&sym_info);
 
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;

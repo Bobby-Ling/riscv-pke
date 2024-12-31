@@ -25,6 +25,28 @@ typedef struct elf_header_t {
   uint16 shstrndx;  /* Section header string table index */
 } elf_header;
 
+typedef struct elf_section_header_t {
+  uint32 sh_name;		/* Section name, index in string tbl */
+  uint32 sh_type;		/* Type of section */
+  uint64 sh_flags;
+  uint64 sh_addr;
+  uint64 sh_offset;	/* Section file offset */
+  uint64 sh_size;		/* Size of section in bytes */
+  uint32 sh_link;
+  uint32 sh_info;
+  uint64 sh_addralign;
+  uint64 sh_entsize;	/* Entry size if section holds table */
+}elf_section_header;
+
+typedef struct elf_sym {
+  uint32 st_name;		/* Symbol name, index in string tbl */
+  unsigned char	st_info;	/* Type and binding attributes */
+  unsigned char	st_other;	/* No defined meaning, 0 */
+  uint16 st_shndx;		/* Associated section index */
+  uint64 st_value;		/* Value of the symbol */
+  uint64 st_size;		/* Associated symbol size */
+} elf_symbol;
+
 // Program segment header.
 typedef struct elf_prog_header_t {
   uint32 type;   /* Segment type */
@@ -39,6 +61,20 @@ typedef struct elf_prog_header_t {
 
 #define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
+
+#define SYM_NAME_MAX 64
+#define SYM_MAX 64
+#define ELF_ST_TYPE(info) ((info) & 0xf) // 提取符号类型
+#define ELF_SYMTAB 2 // 假设类型为 2 的节是符号表（需根据实际解析调整）
+#define STT_FUNC 18
+
+typedef struct symbol_info_t {
+  elf_symbol symbols[SYM_MAX];
+  char sym_names[SYM_MAX][SYM_NAME_MAX];
+  int sym_count;
+} symbol_info;
+
+extern symbol_info sym_info;
 
 typedef enum elf_status_t {
   EL_OK = 0,
