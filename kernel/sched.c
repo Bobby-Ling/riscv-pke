@@ -28,7 +28,7 @@ void insert_to_ready_queue( process* proc ) {
   // browse the ready queue to see if proc is already in-queue
   for( p=ready_queue_head; p->queue_next!=NULL; p=p->queue_next )
     if (p == proc) {
-      // sprint("insert_to_ready_queue: %d already in queue\n", p->pid);
+      sprint("insert_to_ready_queue: %d already in queue\n", p->pid);
       return;  //already in queue
     }
 
@@ -46,7 +46,7 @@ void print_ready_queue() {
 
   // 检查队列是否为空
   if (ready_queue_head == NULL) {
-    sprint("[Empty Queue]\n");
+    sprint("Empty Queue]\n");
     return;
   }
 

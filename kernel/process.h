@@ -90,6 +90,9 @@ typedef struct process_t {
 
   // accounting. added @lab3_3
   int tick_count;
+
+  // wait child pid. added @lab3_challenge1_wait
+  uint64 wait_child_pid;
 }process;
 
 // switch to run user app

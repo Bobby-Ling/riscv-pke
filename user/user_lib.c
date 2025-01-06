@@ -80,6 +80,13 @@ void yield() {
 //
 // lib call to wait
 //
-void wait(int pid) {
-  do_user_call(SYS_user_wait, pid, 0, 0, 0, 0, 0, 0);
+int wait(int pid) {
+  return do_user_call(SYS_user_wait, pid, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to getpid
+//
+int getpid() {
+  return do_user_call(SYS_user_getpid, 0, 0, 0, 0, 0, 0, 0);;
 }

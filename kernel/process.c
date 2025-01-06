@@ -97,6 +97,7 @@ process* alloc_process() {
     panic( "cannot find any free process structure.\n" );
     return 0;
   }
+  procs[i].wait_child_pid = -1;
 
   // init proc[i]'s vm space
   procs[i].trapframe = (trapframe *)alloc_page();  //trapframe, used to save context
@@ -300,7 +301,7 @@ int do_fork( process* parent)
  * @return 0: 如果没有子进程(暂时不关注)
  */
 int do_wait(int pid) {
-  // sprint("do_wait: %d call wait %d.\n", current->pid, pid);
+  sprint("do_wait: %d call wait %d.\n", current->pid, pid);
   // process 0 call wait -1.
   // process 1 call wait 2.
   // procs[pid]
@@ -308,34 +309,48 @@ int do_wait(int pid) {
   if (pid == -1) {
     // 找到一个即可
     bool find = FALSE;
+    print_processes();
     for (int i = 0; i < NPROC; i++) {
-      if (procs[i].parent == current) {
+      if (procs[i].status != ZOMBIE && procs[i].parent == current) {
         find = TRUE;
         wait_pid = i;
+        // break;
       }
     }
     if (!find) {
-      // sprint("do_wait: no child\n");
-      return 0;
+      sprint("do_wait: no child\n");
+      return -1;
+    }
+    else {
+      sprint("do_wait: found %d\n", wait_pid);
     }
   }
-  if (wait_pid < NPROC) {
+  if (0 <= wait_pid && wait_pid < NPROC) {
+    if (current->pid != procs[wait_pid].parent->pid) {
+      sprint("%d is not child of %d", wait_pid, current->pid);
+      return -1;
+    }
+    if (procs[wait_pid].status == ZOMBIE) {
+      return -1;
+    }
     // current将等待pid的终止
     current->status = BLOCKED;
+    current->wait_child_pid = wait_pid;
     // sprint("do_wait: %d %d %d %d.\n",
     // current->pid, current->status, wait_pid, procs[wait_pid].status);
-    // print_ready_queue();
     // insert_to_ready_queue(current);
     // print_ready_queue();
     // print_processes();
     // 从就绪队列(ready queue)中选取下一个可运行的进程, 并将其切换为当前运行的进程(current)
     // 即下一步运行pid
     schedule();
+    sprint("parent(%d) of %d invoked!\n", current->pid, wait_pid);
+    return pid;
   }
   else {
-    panic("invalid pid %d\n", pid);
+    sprint("invalid pid %d\n", pid);
+    return -1;
   }
-  return 0;
 }
 
 void print_processes() {
@@ -368,7 +383,7 @@ void print_processes() {
         break;
     }
 
-    sprint("{%d: %s} ", p->pid, status_str);
+    sprint("{%d: %s w: %d p: %d} ", p->pid, status_str, p->wait_child_pid, p->parent ? p->parent->pid : -1);
     p = p->queue_next;
   }
   sprint("]\n");

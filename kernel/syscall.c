@@ -38,11 +38,13 @@ ssize_t sys_user_exit(uint64 code) {
   // therefore, shutdown the system when the app calls exit()
   // shutdown(code);
   // reclaim the current process, and reschedule. added @lab3_1
-  free_process( current );
-  if (current->parent) {
+  free_process(current);
+  if (current->parent && current->parent->wait_child_pid == current->pid) {
     // 结束时要将阻塞的父进程复活
-    // sprint("sys_user_exit: %d: %d\n", current->pid, current->parent->pid);
+    sprint("sys_user_exit: parent %d child %d\n", current->parent->pid, current->pid);
+    current->parent->wait_child_pid = -1;
     insert_to_ready_queue(current->parent);
+    print_ready_queue();
   }
   schedule();
   return 0;
@@ -112,6 +114,14 @@ ssize_t sys_user_wait(int pid) {
   return do_wait(pid);
 }
 
+
+//
+// kerenl entry point of getpid
+//
+ssize_t sys_user_getpid() {
+  return current->pid;
+}
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -133,6 +143,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_yield();
     case SYS_user_wait:
       return sys_user_wait(a1);
+    case SYS_user_getpid:
+      return sys_user_getpid();
     default:
       panic("Unknown syscall %ld \n", a0);
   }
