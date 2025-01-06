@@ -28,9 +28,26 @@ int main(void) {
   // the max limit of the number is 4kB/4 = 1024
 
   // SECOND, we use array out of bound to trigger pagefaults in an invalid address
+  // 从USER_FREE_ADDRESS_START = 4MB开始分配一个4KB
+  printu("--------------测试基础功能--------------\n");
+  /*
+  两种缺页异常
+  1. 函数递归调用(栈不够用): 可以直接新分配一个栈(VA递减)
+  2. 访问越界: 要能够判断
+  */
   int *ans = (int *)naive_malloc();
+  // printu("Summation of an arithmetic sequence from 0 to %ld is: %ld \n", n, sum_sequence(n+1, ans) );
 
-  printu("Summation of an arithmetic sequence from 0 to %ld is: %ld \n", n, sum_sequence(n+1, ans) );
+  printu("--------------测试全部功能--------------\n");
+  char *mem = (char *)naive_malloc();
+  mem[0] = 'a';
+  mem[4095] = 'b';
+  printu("ans: %lx, mem: %lx\n", ans, mem);
+  naive_free(mem);
+  // printu("mem[0]: %c, mem[4095]: %c, mem[4096]: %c\n", mem[0], mem[4095], mem[4096]);
+  printu("mem[0]: %c, mem[4095]: %c\n", mem[0], mem[4095]);
+
+
 
   exit(0);
 }

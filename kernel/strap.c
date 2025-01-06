@@ -11,6 +11,7 @@
 #include "util/functions.h"
 
 #include "spike_interface/spike_utils.h"
+#include "memlayout.h"
 
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c
@@ -55,6 +56,8 @@ void handle_mtimer_trap() {
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
   sprint("handle_page_fault: %lx\n", stval);
   switch (mcause) {
+    // 添加读时的缺页异常
+    case CAUSE_LOAD_PAGE_FAULT:
     case CAUSE_STORE_PAGE_FAULT:
       // TODO (lab2_3): implement the operations that solve the page fault to
       // dynamically increase application stack.
@@ -67,6 +70,53 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
       // stval: Supervisor Trap Value
       // 页面错误的情况下, stval 存储的是触发页面错误的虚拟地址, 很可能非整PGSIZE
       // 分配一个物理页
+
+      /*
+      1. 本函数为S模式
+      2. alloc_page在何处分配?
+        物理内存
+      3. 如何判断缺页和越界?
+        3.1 目前可以得到哪些信息?
+          - stval: 实际访问的VA
+          - current->trapframe->regs.sp: 程序的栈顶VA, 默认为USER_STACK_TOP = 0x7ffff000, 初始分配4KB
+        3.2 正常时是什么情况?
+          - 栈缺页: 比如初始4KB, 访问4097, 则合法栈空间为: [SP, USER_STACK_TOP - n * PGSIZE]
+          - 堆缺页: 页表有项, 但是无效
+        3.3 缺页时如何决策?
+          1. VA栈合法
+              有效缺页
+          2. VA栈非法
+            2.1 页表存在项(只可能无效项)
+              有效缺页
+            2.2 页表不存在项
+              权限错误缺页
+      */
+      // if (current->trapframe->regs.sp < stval) panic("栈访问越界");
+
+      uint64 va = stval;
+      uint64 sp = current->trapframe->regs.sp;
+      pagetable_t page_table = (pagetable_t)current->pagetable;
+
+      // 1. 检查VA是否合法
+      // sp是当前栈顶(最小值), 访问地址必须在[sp, USER_STACK_TOP]范围内
+      if (!(sp <= va && va <= USER_STACK_TOP)) {
+      // 2. 是否有页表项
+        pte_t *pte = page_walk(page_table, va, 0);
+        if (pte == 0 || (*pte & PTE_V) == 0) {
+          panic("this address is not available!\n");
+        }
+        else {
+          // 如果页表项存在, 则此时一定是无效的(Assert)
+          print_page_table(page_table, 2, 0);
+          sprint("页表项存在: %lx %lx %d\n", *pte, va, lookup_pa(page_table, va));
+          assert((*pte & PTE_V) == 0);
+        }
+      }
+      else {
+        sprint("合法栈空间内: %lx %lx %lx\n", sp, va, USER_STACK_TOP);
+      }
+
+      // 3. 是有效缺页, 分配新页面
       uint64 new_page_pa = (uint64)alloc_page();
       user_vm_map(
         (pagetable_t)current->pagetable,

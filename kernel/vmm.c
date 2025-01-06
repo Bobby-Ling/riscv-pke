@@ -197,7 +197,7 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   // panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
 
   pte_t *pte;
-  if ((va & PGSIZE) != 0) panic("user_vm_unmap: not aligned");
+  if ((va % PGSIZE) != 0) panic("user_vm_unmap: not aligned");
   // 以PGSIZE为基本单位, size不一定为PGSIZE整数倍
   for (uint64 a = va;a < va + size;a += PGSIZE) {
     // 对区间内每一个PAGE查找PTE
@@ -209,5 +209,45 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
       free_page((void *)pa);
     }
     *pte = 0;
+  }
+}
+
+void print_page_table(pagetable_t pagetable, int level, uint64 va_prefix) {
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      // 计算这个页表项对应的VA
+      uint64 va = va_prefix;
+      if (level == 2)
+        va |= ((uint64)i << 30);
+      else if (level == 1)
+        va |= ((uint64)i << 21);
+      else // level == 0
+        va |= ((uint64)i << 12);
+
+      // 调整缩进逻辑：使用2-level来确定缩进层数
+      // 因为level从2开始递减，所以用2-level可以让缩进随着层级增加
+      for (int j = 0; j < (2 - level); j++)
+        sprint(".. ");
+
+      // 获取物理地址
+      uint64 pa = PTE2PA(pte);
+
+      // sprint("%d: va=0x%016lx pa=0x%016lx flags=[", i, va, pa);
+      sprint("%d: pte=0x%016lx va=0x%016lx pa=0x%016lx flags=[", i, pte, va, pa);
+
+      if (pte & PTE_V) sprint("V ");
+      if (pte & PTE_R) sprint("R ");
+      if (pte & PTE_W) sprint("W ");
+      if (pte & PTE_X) sprint("X ");
+      if (pte & PTE_U) sprint("U ");
+      sprint("]\n");
+
+      // 如果不是叶子页表项，递归打印下一级
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+        uint64 next_va_prefix = va;
+        print_page_table((pagetable_t)pa, level - 1, next_va_prefix);
+      }
+    }
   }
 }
