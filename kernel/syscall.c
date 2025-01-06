@@ -56,28 +56,29 @@ int get_sym_index(uint64 text_addr) {
   return -1; // 未找到
 }
 
-// int get_stack_trace(uint64 level, stack_trace *trace) {
-//   if (!trace) return -1;
+int get_stack_trace(uint64 level, stack_trace *trace) {
+  if (!trace) return -1;
 
-//   // print_backtrace的fp
-//   frame_info *frame = (frame_info *)current->trapframe->regs.s0;
-//   trace->depth = 0;
+  // print_backtrace的fp
+  // frame_info *frame = (frame_info *)(current->trapframe->regs.s0);
+  frame_info *frame = (frame_info *)((*((uint64 *)current->trapframe->regs.s0 - 1)) - sizeof(frame_info));
+  trace->depth = 0;
 
-//   while (frame && trace->depth < level) {
-//     trace->return_addrs[trace->depth] = frame->return_addr;
-//     sprint("get_stack_trace: %lx\n", frame->return_addr);
-//     trace->depth++;
+  while (frame && trace->depth < level) {
+    trace->return_addrs[trace->depth] = frame->return_addr;
+    sprint("get_stack_trace: %lx\n", frame->return_addr);
+    trace->depth++;
 
-//     if (frame->saved_fp == 0) {
-//       // sprint("到达栈底\n");
-//       break;
-//     }
-//     frame = (frame_info *)frame->saved_fp; // 下一个栈帧
-//     sprint("frame: %lx frame->saved_fp: %lx\n", frame, frame->saved_fp);
-//   }
+    if (frame->saved_fp == 0) {
+      sprint("到达栈底\n");
+      break;
+    }
+    frame = (frame_info *)(frame->saved_fp - sizeof(frame_info)); // 下一个栈帧
+    sprint("frame: %lx frame->saved_fp: %lx\n", frame, frame->saved_fp);
+  }
 
-//   return 0; // 成功
-// }
+  return 0; // 成功
+}
 
 // int get_stack_trace(uint64 level, stack_trace *trace) {
 //   if (!trace) return -1;
@@ -101,20 +102,20 @@ int get_sym_index(uint64 text_addr) {
 //   return 0;
 // }
 
-ssize_t get_stack_trace(uint64 level, stack_trace *trace) {
-  trace->depth = 0;
+// ssize_t get_stack_trace(uint64 level, stack_trace *trace) {
+//   trace->depth = 0;
 
-  uint64 fp = current->trapframe->regs.s0;
-  fp = *((uint64 *)(fp - 8));
-  for (int i = 0;i < level;i++) {
-    if (fp) {
-      trace->return_addrs[trace->depth] = *(uint64 *)(fp - 8);
-      trace->depth++;
-    }
-    fp = *((uint64 *)(fp - 16));
-  }
-  return 0;
-}
+//   uint64 fp = current->trapframe->regs.s0;
+//   fp = *((uint64 *)(fp - 8));
+//   for (int i = 0;i < level;i++) {
+//     if (fp) {
+//       trace->return_addrs[trace->depth] = *(uint64 *)(fp - 8);
+//       trace->depth++;
+//     }
+//     fp = *((uint64 *)(fp - 16));
+//   }
+//   return 0;
+// }
 
 void print_stack_trace(const stack_trace *trace) {
   if (!trace || trace->depth == 0) {
@@ -244,21 +245,55 @@ ssize_t sys_user_print_backtrace(uint64 level) {
     81000010:	6402       	ld	s0,0(sp)      恢复s0
     81000012:	0141       	addi	sp,sp,16    释放栈帧
     81000014:	8082       	ret               return至ra
+
+    高地址
+    +------------------+
+    |   f7局部变量      |
+    +==================+ <--- f8的fp，指向f7的局部变量
+    |  saved ra to f7  |
+    +------------------+
+    |  saved old fp    |
+    |    无局部变量     |
+    +==================+ <--- f8的sp，print_backtrace的fp
+    |  saved ra to f8  |
+    +------------------+
+    |  saved old fp    |
+    |    无局部变量     |
+    +==================+ <--- print_backtrace的sp，do_user_call的fp，就是(current->trapframe->regs.s0)
+    | 注意do_user_call这里存没有ra|
+    +------------------+
+    |  saved old fp    |
+    +------------------+
+    | do_user_call局部变量 |
+    +==================+ <--- do_user_call的sp
+    低地址
   */
-  frame_info *frame = (frame_info *)regs->s0;
-  // sprint("saved_fp: %lx, ra: %lx\n", frame->saved_fp, frame->return_addr);
+  frame_info *frame = (frame_info *)((*((uint64 *)regs->s0 - 1)) - sizeof(frame_info));
+  sprint("saved_fp: %lx, ra: %lx\n", frame->saved_fp, frame->return_addr);
   // saved_fp: 00000000810fff80, ra: 000000008100000e(在f8中)
 
   /*
   核心思路:
-  1. 从print_backtrace的fp(00000000810fff60)得到f8的ra(000000008100000e)和fp(00000000810fff80)
-  2. 根据ra(text地址)从elf镜像中得到所属函数, 根据f8的fp得到f7的ra
-  3. 递归得到调用栈
+  1.	陷入内核后通过current获得fp(do_user_call的fp)（还可以获得print_backtrace中的ra）；
+  2.	do_user_call的fp-8保存的是返回至f8的地址；
+  3.	可以通过fp一级级得到saved fp，继而得到各层ra；
+  4.	得到ra后可以根据符号表中函数的起始地址确定ra所属的函数地址；
+  5.	根据函数地址得到符号名称字符串。
   */
 
   stack_trace stack_tr;
   get_stack_trace(level, &stack_tr);
   // print_stack_trace(&stack_tr);
+  /*
+  Stack Trace (Depth: 7):
+    #0: 0x000000008100000e -> f8
+    #1: 0x0000000081000022 -> f7
+    #2: 0x0000000081000036 -> f6
+    #3: 0x000000008100004a -> f5
+    #4: 0x000000008100005e -> f4
+    #5: 0x0000000081000072 -> f3
+    #6: 0x0000000081000086 -> f2
+  */
   print_stack_trace_simple(&stack_tr);
   return 0;
 }

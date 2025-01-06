@@ -227,7 +227,7 @@ void load_bincode_from_host_elf(process *p) {
 
   load_symbols(&elfloader);
 
-  // print_symbol_info(&sym_info);
+  print_symbol_info(&sym_info);
 
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;

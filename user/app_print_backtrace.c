@@ -6,18 +6,27 @@
 #include "user_lib.h"
 #include "util/types.h"
 
-void f8() { print_backtrace(7); }
-void f7() { f8(); }
-void f6() { f7(); }
-void f5() { f6(); }
+void f8() { print_backtrace(100); }
+void f7() { int a = 1;f8();int b = a; }
+void f6() { int a = 1;f7(); }
+void f5() { f6();int b = 1; }
 void f4() { f5(); }
-void f3() { f4(); }
-void f2() { f3(); }
-void f1() { f2(); }
+void f3() { int a = 1;f4();int b = a;int c = 1; }
+void f2() { f3();int b = 1; }
+void f1() { int a = 1;f2(); }
+
+void recursive(int level) {
+  if (level == 63) {
+    print_backtrace(level);
+    return;
+  }
+  recursive(++level);
+}
 
 int main(void) {
   printu("back trace the user app in the following:\n");
-  f1();
+  // f1();
+  recursive(0);
   /*
   int a[65];
   // a[64]: 00000000810fffe8
